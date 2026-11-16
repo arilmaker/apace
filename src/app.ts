@@ -49,7 +49,11 @@ export async function app(req: IncomingMessage, res: ServerResponse): Promise<vo
       return;
     }
     const url = new URL(req.url ?? '/', 'http://localhost');
-    const path = url.pathname.replace(/^\/api(?=\/|$)/, '').replace(/\/+$/, '') || '/';
+    // Vercel meneruskan path asli lewat rewrite (?__p=...); fallback ke pathname biasa.
+    const fwd = url.searchParams.get('__p');
+    url.searchParams.delete('__p');
+    const rawPath = fwd !== null ? '/' + fwd : url.pathname.replace(/^\/api(?=\/|$)/, '');
+    const path = rawPath.replace(/\/+$/, '') || '/';
     const method = req.method ?? 'GET';
 
     const hit = router.match(method, path);
