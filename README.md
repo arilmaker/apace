@@ -76,3 +76,18 @@ npm test            # 93 test, tanpa database/email sungguhan
 - Polling ≈ 20 request/menit per pengguna aktif. Cukup untuk ratusan pengguna di paket gratis; untuk
   ribuan, pindah ke Ably/Pusher (cukup ganti `/events`).
 - Gmail App Password dibatasi ±500 email/hari. Untuk lebih banyak, ganti `src/mail.ts` ke Resend/SendGrid.
+
+
+## Deploy frontend Admin Dashboard
+
+Di Vercel, pastikan **Root Directory** project diarahkan ke folder `backend`
+(folder yang berisi `vercel.json`, `api/`, `src/`, `public/`, dan `package.json`).
+Jangan mengatur `public/` sebagai root directory.
+
+- `/` menampilkan `public/admin/login.html`.
+- `/admin` dan `/admin/` menampilkan `public/admin/index.html`.
+- `/admin/assets/...` dilayani langsung sebagai static files dari `public/admin/assets/`.
+- `/api/*` tetap ditangani oleh Vercel Function `api/[...path].ts`.
+
+Path CSS dan JavaScript pada kedua halaman admin menggunakan path absolut
+`/admin/assets/...`, sehingga tidak berubah ketika halaman login dibuka melalui `/`.
