@@ -1,0 +1,54 @@
+/* ═══════════ ANIMASI (keyframes + utilitas) ═══════════ */
+@keyframes floaty { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-18px) rotate(25deg); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { opacity: 0; transform: translateY(26px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { opacity: 0; transform: scale(.7) translateY(14px); } 60% { opacity: 1; transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes popOut { to { opacity: 0; transform: scale(.9) translateY(10px); } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(105%); } to { transform: none; } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 15% { transform: translateX(-9px) rotate(-1deg); } 35% { transform: translateX(8px) rotate(1deg); } 55% { transform: translateX(-6px); } 75% { transform: translateX(4px); } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47,212,127,.7); } 100% { box-shadow: 0 0 0 12px rgba(47,212,127,0); } }
+@keyframes blink { 50% { opacity: .15; } }
+@keyframes wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-14deg) scale(1.1); } 75% { transform: rotate(14deg) scale(1.1); } }
+@keyframes bounceY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+@keyframes growY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes drawLine { from { stroke-dashoffset: var(--len, 600); } to { stroke-dashoffset: 0; } }
+@keyframes dotPop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes waveMove { to { background-position-x: -64px; } }
+@keyframes check { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+@keyframes flyPlane { 0% { transform: none; opacity: 1; } 55% { transform: translate(60px,-40px) rotate(18deg) scale(.6); opacity: 0; } 56% { transform: translate(-50px,30px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes confetti { 0% { transform: translate(0,0) rotate(0); opacity: 1; } 100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+@keyframes ripple { to { transform: scale(4); opacity: 0; } }
+@keyframes glow { 0%,100% { text-shadow: 0 0 0 transparent, 4px 4px 0 var(--blue); } 50% { text-shadow: 0 0 22px rgba(94,200,255,.65), 4px 4px 0 var(--blue); } }
+
+.stagger { opacity: 0; animation: rise .6s var(--ease-pop) forwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.pop-in { animation: pop .5s var(--ease-pop) both; }
+.fade-in { animation: fade .4s ease both; }
+.spin { animation: spin .8s linear infinite; }
+.bounce { animation: bounceY 2.4s ease-in-out infinite; }
+.shake { animation: shake .5s ease; }
+
+[data-anim] .ico { transition: transform .3s var(--ease-pop); }
+[data-anim='wiggle']:hover .ico { animation: wiggle .55s ease; }
+[data-anim='spin']:hover .ico { animation: spin .7s ease; }
+[data-anim='bounce']:hover .ico { animation: bounceY .5s ease 2; }
+[data-anim='zap']:hover .ico { transform: scale(1.3) rotate(-12deg); }
+[data-anim='slide']:hover .ico { transform: translateX(5px); }
+[data-anim='down']:hover .ico { transform: translateY(4px); }
+[data-anim='plus']:hover .ico { transform: rotate(90deg) scale(1.15); }
+[data-anim='fly']:hover .ico { transform: translate(4px,-4px) rotate(8deg); }
+[data-anim='shake']:hover .ico { animation: shake .45s ease; }
+
+.wave {
+  height: 18px; margin: 26px auto; width: min(320px, 70%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='18' viewBox='0 0 64 18'%3E%3Cpath d='M0 9 Q8 0 16 9 T32 9 T48 9 T64 9' fill='none' stroke='%232f6bff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x center;
+  animation: waveMove 2.4s linear infinite;
+}
+
+.skel { position: relative; overflow: hidden; background: var(--soft); border-radius: 10px; color: transparent !important; }
+.skel::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: shimmer 1.3s infinite; }
+
+.btn, .chip { position: relative; overflow: hidden; }
+.rip { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: rgba(255,255,255,.55); transform: scale(0); animation: ripple .6s ease-out forwards; pointer-events: none; }
