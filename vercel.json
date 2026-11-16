@@ -53,6 +53,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "/api/index?__p=:path*"
+    },
+    {
       "source": "/",
       "destination": "/admin/login.html"
     },
