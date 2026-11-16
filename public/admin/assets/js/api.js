@@ -1,7 +1,28 @@
 import { API_BASE, TOKEN_KEY } from './config.js';
 
+function readableError(value, fallback = 'Permintaan gagal. Coba lagi.') {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const parts = value.map((item) => readableError(item, '')).filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+  }
+  if (value && typeof value === 'object') {
+    for (const key of ['message', 'error', 'detail', 'description', 'reason']) {
+      const message = readableError(value[key], '');
+      if (message) return message;
+    }
+  }
+  return fallback;
+}
+
 export class ApiError extends Error {
-  constructor(message, status, data = {}) { super(message); this.status = status; this.data = data; this.code = data.code ?? null; }
+  constructor(message, status, data = {}) {
+    super(readableError(message, `Terjadi kesalahan (${status || 'jaringan'}).`));
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.code = data?.code ?? null;
+  }
 }
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
@@ -26,7 +47,7 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
     clearToken();
     if (!location.pathname.endsWith('login.html')) location.replace('/admin/login.html');
   }
-  if (!res.ok) throw new ApiError(data.error || `Terjadi kesalahan (${res.status})`, res.status, data);
+  if (!res.ok) throw new ApiError(readableError(data?.error ?? data?.message, `Terjadi kesalahan (${res.status})`), res.status, data);
   return data;
 }
 
