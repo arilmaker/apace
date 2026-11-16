@@ -52,9 +52,13 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    }
+  {
+    "source": "/",
+    "destination": "/admin/login.html"
+  },
+  {
+    "source": "/admin",
+    "destination": "/admin/index.html"
+  }
   ]
 }
