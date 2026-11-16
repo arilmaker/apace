@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d1b4c">
+  <title>Masuk Admin — R1ZCHATID</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%232f6bff%27/%3E%3Ctext y=%2772%27 x=%2750%27 text-anchor=%27middle%27 font-size=%2762%27%3E💬%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fraunces:opsz,wght@9..144,700;9..144,800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script src="assets/js/theme-init.js"></script>
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+  <div class="deco" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <button class="icon-btn login__theme" id="theme" aria-label="Ganti tema" data-anim="spin"></button>
+  <main class="login">
+    <section class="login__card">
+      <header class="login__top">
+        <span class="kicker">ADMIN ONLY</span>
+        <div id="brand"></div>
+        <p>Control Panel</p>
+      </header>
+      <form class="login__form" id="form" autocomplete="on" novalidate>
+        <div class="notice-box notice-box--red err" id="err" hidden></div>
+        <div class="field"><label for="u">Username</label>
+          <input class="input" id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="username admin" required></div>
+        <div class="field"><label for="p">Password</label>
+          <div class="input-wrap"><input class="input" id="p" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <button type="button" class="icon-btn" id="eye" aria-label="Tampilkan password" data-anim="bounce"></button></div></div>
+        <button class="btn btn--blue btn--block btn--skew" id="go" type="submit" data-anim="slide"><span id="goTxt"></span></button>
+        <p class="login__foot">🔒 Sesi aman · otomatis keluar setelah 12 jam</p>
+      </form>
+    </section>
+  </main>
+  <script type="module" src="assets/js/login.js"></script>
+</body>
+</html>
