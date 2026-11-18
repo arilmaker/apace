@@ -9,7 +9,7 @@ export function registerUsers(r: Router) {
     const q = (query.get('q') ?? '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '').slice(0, 20);
     if (q.length < 2) return { users: [] };
     const rows = await sql`
-      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_color, u.public_key
+      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key
       from users u
       where u.username is not null
         and starts_with(u.username, ${q})

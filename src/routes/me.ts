@@ -17,6 +17,18 @@ export function registerMe(r: Router) {
     const about = b.about === undefined ? null : v.str(b.about, 'Tentang', 0, 140);
     const avatarEmoji = b.avatarEmoji === undefined ? null : v.emoji(b.avatarEmoji);
     const avatarColor = b.avatarColor === undefined ? null : v.color(b.avatarColor);
+    // Foto profil: URL publik Vercel Blob (hasil POST /media?purpose=avatar). null / '' = hapus foto.
+    const avatarUrlSet = b.avatarUrl !== undefined;
+    let avatarUrl: string | null = null;
+    if (avatarUrlSet && b.avatarUrl) {
+      const s = String(b.avatarUrl);
+      let host = '';
+      try { host = new URL(s).hostname; } catch { /* abaikan */ }
+      if (s.length > 600 || !s.startsWith('https://') || !host.endsWith('.public.blob.vercel-storage.com')) {
+        throw badRequest('URL foto profil tidak valid');
+      }
+      avatarUrl = s;
+    }
     const showLastSeen = v.optBool(b.showLastSeen, 'showLastSeen') ?? null;
     const readReceipts = v.optBool(b.readReceipts, 'readReceipts') ?? null;
     const [u] = await sql`
@@ -25,6 +37,7 @@ export function registerMe(r: Router) {
         about          = coalesce(${about}::text, about),
         avatar_emoji   = coalesce(${avatarEmoji}::text, avatar_emoji),
         avatar_color   = coalesce(${avatarColor}::text, avatar_color),
+        avatar_url     = case when ${avatarUrlSet}::boolean then ${avatarUrl}::text else avatar_url end,
         show_last_seen = coalesce(${showLastSeen}::boolean, show_last_seen),
         read_receipts  = coalesce(${readReceipts}::boolean, read_receipts)
       where id = ${uid}::uuid returning *`;

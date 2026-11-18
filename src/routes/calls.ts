@@ -41,7 +41,7 @@ export function registerCalls(r: Router) {
       select c.id, c.conversation_id, c.kind,
         case when c.status = 'ringing' and c.created_at < now() - interval '90 seconds' then 'missed' else c.status end as status,
         c.created_at, c.answered_at, c.ended_at, (c.caller_id = ${uid}::uuid) as outgoing,
-        u.id as peer_id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_color, u.public_key
+        u.id as peer_id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key
       from calls c
       join users u on u.id = case when c.caller_id = ${uid}::uuid then c.callee_id else c.caller_id end
       where c.caller_id = ${uid}::uuid or c.callee_id = ${uid}::uuid

@@ -50,7 +50,7 @@ export async function loadConversations(uid: string, onlyId: string | null = nul
   const ids = rows.map((r) => r.id);
 
   const [members, blockRows] = await sql.transaction([
-    sql`select cm.conversation_id, cm.role, u.id, u.username, u.display_name, u.about, u.avatar_emoji,
+    sql`select cm.conversation_id, cm.role, u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url,
                u.avatar_color, u.public_key,
                (u.last_seen_at > now() - interval '40 seconds') as online,
                case when u.show_last_seen then u.last_seen_at else null end as last_seen_at

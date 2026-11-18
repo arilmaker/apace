@@ -7,7 +7,7 @@ import * as v from '../validate';
 export function registerBlocks(r: Router) {
   r.add('GET', '/blocks', async ({ uid }) => {
     const rows = await sql`
-      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_color, u.public_key
+      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key
       from blocks b join users u on u.id = b.blocked_id
       where b.blocker_id = ${uid}::uuid order by b.created_at desc`;
     return { users: rows.map(publicUser) };

@@ -34,7 +34,7 @@ export function registerStatuses(r: Router) {
     const rows = await sql`
       select s.id, s.user_id, s.ciphertext, s.nonce, s.sender_key, s.created_at, s.expires_at,
              k.wrapped_key, k.wrap_nonce,
-             u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_color, u.public_key,
+             u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key,
              exists (select 1 from status_views w where w.status_id = s.id and w.viewer_id = ${uid}::uuid) as viewed,
              (select count(*)::int from status_views w where w.status_id = s.id) as view_count
       from statuses s
@@ -133,7 +133,7 @@ export function registerStatuses(r: Router) {
     if (!s) throw notFound('Status tidak ditemukan');
     if (s.user_id !== uid) throw forbidden('Hanya pemilik status yang bisa melihat daftar penonton');
     const rows = await sql`
-      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_color, u.public_key, w.viewed_at
+      select u.id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key, w.viewed_at
       from status_views w join users u on u.id = w.viewer_id
       where w.status_id = ${id}::uuid order by w.viewed_at desc`;
     return { views: rows.map((x) => ({ user: publicUser(x), viewedAt: x.viewed_at })) };

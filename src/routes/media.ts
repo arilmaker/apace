@@ -7,7 +7,7 @@ import type { Router } from '../router';
 import * as v from '../validate';
 
 const MAX_CHUNK_BYTES = 4 * 1024 * 1024; // batas body Vercel Functions ~4,5 MB; file besar dikirim per potongan
-const RETENTION_HOURS = { chat: 24 * 30, status: 25, channel: 24 * 180 } as const;
+const RETENTION_HOURS = { chat: 24 * 30, status: 25, channel: 24 * 180, avatar: 24 * 365 * 5 } as const;
 
 const quotaBytes = () => (parseInt(opt('MEDIA_QUOTA_MB', '300'), 10) || 300) * 1024 * 1024;
 
@@ -32,7 +32,7 @@ export function registerMedia(r: Router) {
    * channel (publik) potongan berisi file asli.
    */
   r.add('POST', '/media', async ({ req, query, uid }) => {
-    const purpose = v.oneOf(query.get('purpose') ?? 'chat', 'purpose', ['chat', 'status', 'channel'] as const);
+    const purpose = v.oneOf(query.get('purpose') ?? 'chat', 'purpose', ['chat', 'status', 'channel', 'avatar'] as const);
     const buf = await readBody(req, MAX_CHUNK_BYTES);
     if (buf.length < 16) throw badRequest('File kosong');
 
