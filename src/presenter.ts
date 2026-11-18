@@ -10,6 +10,7 @@ export function publicUser(r: Row) {
     about: r.about,
     avatarEmoji: r.avatar_emoji,
     avatarColor: r.avatar_color,
+    avatarUrl: r.avatar_url ?? null,
     publicKey: r.public_key,
   };
 }
