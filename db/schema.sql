@@ -337,3 +337,6 @@ create table if not exists admin_attempts (
   locked_until timestamptz,
   updated_at   timestamptz not null default now()
 );
+
+-- Foto profil (opsional). Tanpa kolom ini, app tetap memakai emoji.
+alter table users add column if not exists avatar_url text;
