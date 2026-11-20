@@ -360,3 +360,6 @@ create table if not exists app_releases (
 );
 create unique index if not exists app_releases_version_idx on app_releases (version);
 create index if not exists app_releases_active_idx on app_releases (active, created_at desc);
+
+-- Reset perangkat: riwayat panggilan sebelum waktu ini disembunyikan untuk pengguna tersebut.
+alter table users add column if not exists reset_at timestamptz;
