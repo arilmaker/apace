@@ -340,3 +340,23 @@ create table if not exists admin_attempts (
 
 -- Foto profil (opsional). Tanpa kolom ini, app tetap memakai emoji.
 alter table users add column if not exists avatar_url text;
+
+-- Izinkan tujuan unggahan 'avatar' (foto profil)
+alter table media_objects drop constraint if exists media_objects_purpose_check;
+alter table media_objects add constraint media_objects_purpose_check check (purpose in ('chat','status','channel','avatar'));
+
+-- Rilis aplikasi (update wajib): APK dipecah per 4 MB oleh dashboard admin, disimpan sebagai potongan di Vercel Blob.
+create table if not exists app_releases (
+  id          uuid primary key default gen_random_uuid(),
+  version     text not null check (version ~ '^[0-9]+(\.[0-9]+){0,3}$'),
+  notes       text not null default '',
+  force       boolean not null default true,
+  parts       jsonb not null default '[]'::jsonb,   -- [{url, size}] urut
+  size_bytes  bigint not null default 0,
+  sha256      text,
+  external_url text,                                -- alternatif: link unduhan di luar (GitHub Release, dll)
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create unique index if not exists app_releases_version_idx on app_releases (version);
+create index if not exists app_releases_active_idx on app_releases (active, created_at desc);
