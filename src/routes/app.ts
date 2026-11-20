@@ -8,11 +8,13 @@ export function registerApp(r: Router) {
   // Publik: dipanggil aplikasi saat dibuka (dan berkala). ?version=1.0.0 -> server memberi tahu apakah harus update.
   r.add('GET', '/app/notice', async ({ query }) => {
     const version = (query.get('version') ?? '').trim();
-    const [srv, rows] = await Promise.all([
+    const [srv, rows, rel] = await Promise.all([
       sql`select status, message, updated_at from server_status where id = 1`,
       sql`select id, kind, severity, title, body, force_update, min_version, created_at, expires_at
           from announcements where active and (expires_at is null or expires_at > now())
           order by created_at desc limit 10`,
+      sql`select id, version, notes, force, parts, size_bytes, sha256, external_url, created_at
+          from app_releases where active order by created_at desc limit 1`,
     ]);
     const cmp = (a: string, b: string) => {
       const x = a.split('.').map(Number), y = b.split('.').map(Number);
@@ -24,9 +26,21 @@ export function registerApp(r: Router) {
       forceUpdate: !!n.force_update && !!n.min_version && !!version && /^\d+(\.\d+)*$/.test(version) && cmp(version, n.min_version) < 0,
       minVersion: n.min_version, createdAt: n.created_at, expiresAt: n.expires_at,
     }));
+    // Rilis terbaru: aplikasi membandingkan versinya dengan ini. force=true + versi lebih lama -> update wajib.
+    const r0 = rel[0];
+    const valid = /^\d+(\.\d+)*$/.test(version);
+    const updateAvailable = !!r0 && valid && cmp(version, r0.version) < 0;
+    const release = r0
+      ? {
+          id: r0.id, version: r0.version, notes: r0.notes, force: !!r0.force,
+          parts: r0.parts, size: Number(r0.size_bytes), sha256: r0.sha256, externalUrl: r0.external_url,
+          createdAt: r0.created_at, updateAvailable,
+        }
+      : null;
     return {
       server: { status: srv[0]?.status ?? 'ok', message: srv[0]?.message ?? '', updatedAt: srv[0]?.updated_at ?? null },
-      mustUpdate: notices.some((n) => n.forceUpdate),
+      mustUpdate: notices.some((n) => n.forceUpdate) || (updateAvailable && !!r0?.force),
+      release,
       notices,
     };
   }, { public: true });

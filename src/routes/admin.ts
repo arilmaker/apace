@@ -1,10 +1,12 @@
 import type { IncomingMessage } from 'node:http';
 import { checkAdminLogin, issueAdminToken, requireAdmin, ADMIN_TOKEN_TTL } from '../adminAuth';
+import { del, put } from '@vercel/blob';
+import { randomUUID } from 'node:crypto';
 import { sql } from '../db';
 import { emitToUsers } from '../events';
 import { explainSmtpError, sealPassword, verifySmtp } from '../gmailPool';
 import { unseal } from '../secrets';
-import { HttpError, badRequest, conflict, created, notFound, readJson } from '../http';
+import { HttpError, badRequest, conflict, created, notFound, readBody, readJson } from '../http';
 import type { Ctx, Handler, Router } from '../router';
 import * as v from '../validate';
 
@@ -409,5 +411,85 @@ export function registerAdmin(r: Router) {
       on conflict (id) do update set status = excluded.status, message = excluded.message, updated_at = now()
       returning status, message, updated_at`;
     return { ok: true, server: row };
+  });
+
+  // ───────── Rilis aplikasi (update wajib) ─────────
+  const releaseOut = (r: Record<string, any>) => ({
+    id: r.id, version: r.version, notes: r.notes, force: !!r.force, active: !!r.active,
+    size: Number(r.size_bytes), parts: Array.isArray(r.parts) ? r.parts.length : 0,
+    sha256: r.sha256, externalUrl: r.external_url, createdAt: r.created_at,
+  });
+
+  add('GET', '/admin/releases', async () => {
+    const rows = await sql`select * from app_releases order by created_at desc limit 30`;
+    return { releases: rows.map(releaseOut) };
+  });
+
+  // Satu potongan APK (maks 4 MB). Dashboard memanggil ini berulang, lalu POST /admin/releases.
+  add('POST', '/admin/releases/chunk', async ({ req, query }) => {
+    const idx = v.int(Number(query.get('idx')), 'idx', 0, 999);
+    const buf = await readBody(req, 4 * 1024 * 1024);
+    if (!buf.length) throw badRequest('Potongan kosong');
+    let blob;
+    try {
+      blob = await put(`releases/${randomUUID()}-${idx}.part`, buf, {
+        access: 'public', contentType: 'application/octet-stream', addRandomSuffix: true,
+      });
+    } catch (e) {
+      console.error('[R1ZCHATID] simpan potongan rilis gagal', e);
+      throw new HttpError(502, 'Gagal menyimpan ke Vercel Blob. Pastikan store Blob Public dan BLOB_READ_WRITE_TOKEN terpasang.');
+    }
+    return { ok: true, url: blob.url, size: buf.length };
+  });
+
+  add('POST', '/admin/releases', async ({ req }) => {
+    const b = await readJson(req, 100_000);
+    const version = v.str(b.version, 'Versi', 1, 20);
+    if (!/^\d+(\.\d+){0,3}$/.test(version)) throw badRequest('Versi harus seperti 1.0.2');
+    const notes = v.optStr(b.notes, 'Catatan', 2000) ?? '';
+    const force = v.optBool(b.force, 'force') ?? true;
+    const externalUrl = v.optStr(b.externalUrl, 'Link unduhan', 500) ?? null;
+    if (externalUrl && !/^https:\/\//.test(externalUrl)) throw badRequest('Link unduhan harus diawali https://');
+    const partsIn = Array.isArray(b.parts) ? b.parts : [];
+    if (partsIn.length > 200) throw badRequest('Terlalu banyak potongan');
+    const parts = partsIn.map((p: any) => {
+      const url = String(p?.url ?? '');
+      let host = '';
+      try { host = new URL(url).hostname; } catch { /* abaikan */ }
+      if (!url.startsWith('https://') || !host.endsWith('.public.blob.vercel-storage.com')) throw badRequest('URL potongan tidak valid');
+      return { url, size: Number(p?.size) || 0 };
+    });
+    if (!parts.length && !externalUrl) throw badRequest('Unggah APK atau isi link unduhan');
+    const size = parts.reduce((a: number, p: { size: number }) => a + p.size, 0);
+    const sha = v.optStr(b.sha256, 'sha256', 64) ?? null;
+    if (sha && !/^[0-9a-f]{64}$/i.test(sha)) throw badRequest('sha256 tidak valid');
+    const [dup] = await sql`select id from app_releases where version = ${version}`;
+    if (dup) throw conflict('Versi ini sudah pernah dirilis. Pakai nomor versi baru.');
+    const [row] = await sql`
+      insert into app_releases (version, notes, force, parts, size_bytes, sha256, external_url)
+      values (${version}, ${notes}, ${force}, ${JSON.stringify(parts)}::jsonb, ${size}, ${sha?.toLowerCase() ?? null}, ${externalUrl})
+      returning *`;
+    return created({ ok: true, release: releaseOut(row) });
+  });
+
+  add('PATCH', '/admin/releases/:id', async ({ req, params }) => {
+    const id = v.uuid(params.id, 'id');
+    const b = await readJson(req, 2000);
+    const active = v.optBool(b.active, 'active');
+    const force = v.optBool(b.force, 'force');
+    const [row] = await sql`
+      update app_releases set active = coalesce(${active}::boolean, active), force = coalesce(${force}::boolean, force)
+      where id = ${id}::uuid returning *`;
+    if (!row) throw notFound('Rilis tidak ditemukan');
+    return { ok: true, release: releaseOut(row) };
+  });
+
+  add('DELETE', '/admin/releases/:id', async ({ params }) => {
+    const id = v.uuid(params.id, 'id');
+    const [row] = await sql`delete from app_releases where id = ${id}::uuid returning parts`;
+    if (row && Array.isArray(row.parts) && row.parts.length) {
+      try { await del(row.parts.map((p: { url: string }) => p.url)); } catch { /* file mungkin sudah hilang */ }
+    }
+    return { ok: true };
   });
 }

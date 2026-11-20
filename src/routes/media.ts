@@ -42,11 +42,22 @@ export function registerMedia(r: Router) {
     }
 
     const id = randomUUID();
-    const blob = await put(`media/${uid}/${id}.bin`, buf, {
-      access: 'public', // URL acak & tak bisa ditebak
-      contentType: 'application/octet-stream',
-      addRandomSuffix: true,
-    });
+    let blob;
+    try {
+      blob = await put(`media/${uid}/${id}.bin`, buf, {
+        access: 'public', // URL acak & tak bisa ditebak. Store Blob HARUS dibuat dengan akses Public.
+        contentType: 'application/octet-stream',
+        addRandomSuffix: true,
+      });
+    } catch (e) {
+      console.error('[R1ZCHATID] upload Blob gagal', e);
+      const msg = String((e as Error)?.message ?? e);
+      // Penyebab umum: store dibuat sebagai Private, atau token BLOB_READ_WRITE_TOKEN belum terpasang.
+      const hint = /private|access/i.test(msg)
+        ? 'Store Blob harus dibuat dengan akses Public (hapus store lalu buat ulang dengan pilihan Public).'
+        : 'Penyimpanan media belum siap. Pastikan BLOB_READ_WRITE_TOKEN ada di Environment Variables lalu redeploy.';
+      throw new HttpError(502, `Gagal menyimpan foto. ${hint}`);
+    }
     const hours = RETENTION_HOURS[purpose];
     await sql`insert into media_objects (id, owner_id, url, size_bytes, purpose, expires_at)
               values (${id}::uuid, ${uid}::uuid, ${blob.url}, ${buf.length}, ${purpose},
