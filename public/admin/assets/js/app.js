@@ -6,11 +6,12 @@ import dashboard from './views/dashboard.js';
 import gmail from './views/gmail.js';
 import moderasi from './views/moderasi.js';
 import peringatan from './views/peringatan.js';
+import rilis from './views/rilis.js';
 
 if (!getToken()) location.replace('/admin/login.html');
 initTheme(); initRipple();
 
-const VIEWS = [dashboard, gmail, moderasi, peringatan];
+const VIEWS = [dashboard, gmail, moderasi, peringatan, rilis];
 
 /* ───────── Store statistik (dipakai banyak view) ───────── */
 const store = {

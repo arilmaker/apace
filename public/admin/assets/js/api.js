@@ -56,3 +56,17 @@ export const post = (p, body = {}) => api(p, { method: 'POST', body });
 export const patch = (p, body = {}) => api(p, { method: 'PATCH', body });
 export const put = (p, body = {}) => api(p, { method: 'PUT', body });
 export const del = (p) => api(p, { method: 'DELETE' });
+
+/** Kirim byte mentah (potongan file) dengan token admin. Dipakai unggah APK per 4 MB. */
+export async function apiBytes(path, bytes) {
+  const headers = { Accept: 'application/json', 'Content-Type': 'application/octet-stream' };
+  if (getToken()) headers.Authorization = `Bearer ${getToken()}`;
+  let res;
+  try { res = await fetch(API_BASE + path, { method: 'POST', headers, body: bytes }); }
+  catch { throw new ApiError('Tidak bisa terhubung ke server. Cek internet kamu.', 0); }
+  let data = {};
+  try { data = await res.json(); } catch { /* bukan JSON */ }
+  if (res.status === 401) { clearToken(); location.replace('/admin/login.html'); }
+  if (!res.ok) throw new ApiError(readableError(data?.error ?? data?.message, `Terjadi kesalahan (${res.status})`), res.status, data);
+  return data;
+}
