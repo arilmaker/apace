@@ -44,7 +44,8 @@ export function registerCalls(r: Router) {
         u.id as peer_id, u.username, u.display_name, u.about, u.avatar_emoji, u.avatar_url, u.avatar_color, u.public_key
       from calls c
       join users u on u.id = case when c.caller_id = ${uid}::uuid then c.callee_id else c.caller_id end
-      where c.caller_id = ${uid}::uuid or c.callee_id = ${uid}::uuid
+      where (c.caller_id = ${uid}::uuid or c.callee_id = ${uid}::uuid)
+        and c.created_at > coalesce((select reset_at from users where id = ${uid}::uuid), '-infinity'::timestamptz)
       order by c.created_at desc limit 50`;
     return {
       calls: rows.map((c) => ({

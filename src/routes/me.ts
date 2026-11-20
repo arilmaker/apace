@@ -73,6 +73,36 @@ export function registerMe(r: Router) {
     return { user: selfUser(u) };
   });
 
+  /**
+   * Perangkat baru / pasang ulang: private key lama hilang, jadi semua pesan lama tidak bisa dibuka lagi.
+   * Reset data milik pengguna ini (akun, profil, dan blokir tetap), lalu pasang kunci baru:
+   * daftar chat & riwayat, status, panggilan, bintang, antrean event. Data lawan bicara tidak disentuh.
+   */
+  r.add('POST', '/me/reset-device', async ({ req, uid }) => {
+    const b = await readJson(req);
+    if (b.confirm !== true) throw badRequest('Kirim {"confirm": true} untuk reset perangkat');
+    const publicKey = v.b64(b.publicKey, 'publicKey', 44);
+    if (Buffer.from(publicKey, 'base64url').length !== 32) throw badRequest('publicKey harus 32 byte (X25519)');
+    const res = await sql.transaction([
+      // semua chat disembunyikan + riwayatnya dibersihkan (muncul lagi hanya kalau ada pesan BARU)
+      sql`update conversation_members set hidden = true, pinned = false, archived = false, muted = false,
+            cleared_at = now(), last_read_at = now()
+          where user_id = ${uid}::uuid`,
+      // kunci pesan lama milikku tidak berguna lagi (kunci privatenya sudah hilang)
+      sql`delete from message_keys where user_id = ${uid}::uuid`,
+      sql`delete from message_stars where user_id = ${uid}::uuid`,
+      sql`delete from message_hidden where user_id = ${uid}::uuid`,
+      // status: milikku dihapus, status orang lain yang pernah terenkripsi untukku tidak bisa dibuka lagi
+      sql`delete from statuses where user_id = ${uid}::uuid`,
+      sql`delete from status_keys where user_id = ${uid}::uuid`,
+      sql`delete from status_views where viewer_id = ${uid}::uuid`,
+      sql`delete from events where user_id = ${uid}::uuid`,
+      sql`update users set public_key = ${publicKey}, reset_at = now() where id = ${uid}::uuid returning *`,
+    ]);
+    const u = (res[res.length - 1] as Record<string, any>[])[0];
+    return { ok: true, user: selfUser(u) };
+  });
+
   r.add('DELETE', '/me', async ({ req, uid }) => {
     const b = await readJson(req);
     if (b.confirm !== true) throw badRequest('Kirim {"confirm": true} untuk menghapus akun');
