@@ -1,5 +1,6 @@
 import { icon } from '../icons.js';
-import { get, post, patch, del, apiBytes } from '../api.js';
+import { get, post, patch, del, apiBytesProgress } from '../api.js';
+import { Sha256 } from '../sha256.js';
 import { $, html, raw, confirmBox, toast, timeAgo, fmtDateTime } from '../ui.js';
 
 const CHUNK = 4 * 1024 * 1024 - 1024; // sedikit di bawah 4 MB (batas body Vercel ~4,5 MB)
@@ -26,10 +27,7 @@ export default {
           <label class="field" style="grid-auto-flow:column;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--card-2);border:var(--bw) solid var(--ink);border-radius:14px;cursor:pointer">
             <span><b>Wajib update</b><br><span class="hint">Versi di bawah ini tidak bisa dipakai sampai update</span></span>
             <span class="switch"><input type="checkbox" id="force" checked><span></span></span></label>
-          <div id="prog" style="display:none;margin-top:14px">
-            <div style="height:14px;border:var(--bw) solid var(--ink);border-radius:10px;overflow:hidden;background:var(--card-2)"><div id="bar" style="height:100%;width:0;background:#2f6bff;transition:width .2s"></div></div>
-            <div class="hint" id="ptxt" style="margin-top:6px">Menyiapkan…</div>
-          </div>
+          <div id="ferr" role="alert" style="display:none;margin-top:14px;padding:10px 12px;border:var(--bw) solid var(--ink);border-radius:12px;background:#ffd9da;color:#7a0b10;font-weight:800"></div>
           <button class="btn btn--blue btn--block" id="go" style="margin-top:16px" data-anim="fly">${raw(icon('up'))} Unggah & Terbitkan</button>
         </section>
 
@@ -58,52 +56,126 @@ export default {
     ['#ver', '#notes', '#force'].forEach((s) => el(s).addEventListener('input', preview));
     preview();
 
-    const setProg = (p, text) => { el('#prog').style.display = ''; el('#bar').style.width = `${Math.round(p * 100)}%`; el('#ptxt').textContent = text; };
+    const ferr = (msg) => { const b = el('#ferr'); b.textContent = msg || ''; b.style.display = msg ? '' : 'none'; };
+    const bad = (msg, sel) => { ferr(msg); toast(msg, 'err'); if (sel) el(sel)?.focus(); };
 
-    async function sendChunk(idx, blob, tries = 3) {
+    /** Overlay layar penuh: persen 0–100, tahap yang sedang berjalan, lalu hasil akhir (sukses / gagal + coba lagi). */
+    function openProgress(version) {
+      const ov = document.createElement('div');
+      ov.className = 'overlay';
+      ov.innerHTML = `<div class="modal" role="alertdialog" aria-modal="true" aria-live="polite" style="text-align:center">
+        <div class="modal__head"><span class="tile tile--blue">${icon('rocket')}</span><h3 data-t></h3></div>
+        <div class="modal__body">
+          <div data-pct style="font-size:68px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums">0%</div>
+          <div style="height:20px;border:var(--bw) solid var(--ink);border-radius:12px;overflow:hidden;background:var(--card-2);margin:16px 0 12px"><div data-bar style="height:100%;width:0;background:#2f6bff;transition:width .2s linear"></div></div>
+          <div data-s style="font-weight:800">Menyiapkan…</div>
+          <div class="hint" data-h style="margin-top:6px">Jangan tutup atau tinggalkan halaman ini sampai selesai.</div>
+        </div>
+        <div class="modal__foot" data-f style="justify-content:center"></div></div>`;
+      document.body.append(ov);
+      document.body.style.overflow = 'hidden';
+      const q = (s) => ov.querySelector(s);
+      q('[data-t]').textContent = `Menerbitkan versi ${version}`;
+      return {
+        set(p, status, hint) {
+          const pct = Math.max(0, Math.min(100, Math.round(p)));
+          q('[data-pct]').textContent = `${pct}%`;
+          q('[data-bar]').style.width = `${pct}%`;
+          if (status) q('[data-s]').textContent = status;
+          if (hint !== undefined) q('[data-h]').textContent = hint;
+        },
+        close() { ov.remove(); if (!document.querySelector('.overlay')) document.body.style.overflow = ''; },
+        finish(kind, status, hint, buttons) {
+          q('[data-s]').textContent = status;
+          q('[data-s]').style.color = kind === 'err' ? 'var(--red)' : '';
+          q('[data-h]').textContent = hint || '';
+          q('[data-bar]').style.background = kind === 'err' ? 'var(--red)' : 'var(--mint)';
+          const f = q('[data-f]'); f.textContent = '';
+          for (const b of buttons) {
+            const btn = document.createElement('button');
+            btn.className = `btn ${b.cls || ''}`; btn.textContent = b.label; btn.onclick = b.onClick;
+            f.append(btn);
+          }
+        },
+      };
+    }
+
+    async function sendChunk(idx, buf, onProgress, tries = 3) {
       let last;
       for (let a = 1; a <= tries; a++) {
-        try { return await apiBytes(`/admin/releases/chunk?idx=${idx}`, blob); }
-        catch (e) { last = e; if (e.status && e.status < 500 && e.status !== 0) throw e; await new Promise((r) => setTimeout(r, 800 * a)); }
+        try { return await apiBytesProgress(`/admin/releases/chunk?idx=${idx}`, buf, onProgress); }
+        catch (e) {
+          last = e;
+          if (e.status && e.status < 500) throw e; // 4xx jangan diulang; status 0 (jaringan) dan 5xx diulang
+          onProgress(0, 1);
+          await new Promise((r) => setTimeout(r, 800 * a));
+        }
       }
       throw last;
     }
 
-    el('#go').onclick = async (e) => {
+    async function publish(skipConfirm = false) {
       if (busy) return;
+      ferr('');
       const version = el('#ver').value.trim();
-      if (!/^\d+(\.\d+){0,3}$/.test(version)) { toast('Versi harus seperti 1.0.2', 'err'); el('#ver').focus(); return; }
+      if (!/^\d+(\.\d+){0,3}$/.test(version)) return bad('Versi harus seperti 1.0.2', '#ver');
       const file = el('#apk').files[0];
       const ext = el('#ext').value.trim();
-      if (!file && !ext) { toast('Pilih file APK atau isi link unduhan', 'err'); return; }
-      if (file && !/\.apk$/i.test(file.name)) { toast('File harus berformat .apk', 'err'); return; }
-      if (!(await confirmBox({ title: `Terbitkan versi ${version}?`, text: el('#force').checked ? 'Semua pengguna dengan versi lebih lama akan dipaksa update.' : 'Pengguna akan melihat pemberitahuan update.', ok: 'Terbitkan', ic: 'rocket' }))) return;
+      if (!file && !ext) return bad('Pilih file APK atau isi link unduhan dulu.', '#apk');
+      if (file && !/\.apk$/i.test(file.name)) return bad('File harus berformat .apk', '#apk');
+      if (!file && !/^https:\/\//i.test(ext)) return bad('Link unduhan harus diawali https://', '#ext');
+      const force = el('#force').checked;
+      const notes = el('#notes').value.trim();
 
-      busy = true; const btn = e.currentTarget; btn.classList.add('is-loading');
+      if (!skipConfirm && !(await confirmBox({
+        title: `Terbitkan versi ${version}?`,
+        text: force ? 'Semua pengguna dengan versi lebih lama akan dipaksa update.' : 'Pengguna akan melihat pemberitahuan update.',
+        ok: 'Terbitkan', ic: 'rocket',
+      }))) return;
+
+      busy = true;
+      const btn = el('#go'); // diambil dari DOM, BUKAN e.currentTarget (null setelah await -> dulu bikin tombol macet)
+      btn.classList.add('is-loading');
+      const ov = openProgress(version);
       try {
+        ov.set(0, 'Memeriksa nomor versi…');
+        const { releases } = await get('/admin/releases');
+        if (releases.some((r) => r.version === version)) throw new Error(`Versi ${version} sudah pernah dirilis. Pakai nomor versi yang baru.`);
+
         const parts = []; let sha = null;
         if (file) {
-          setProg(0, 'Menghitung sidik jari file…');
-          sha = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+          const hash = new Sha256();
           const total = Math.ceil(file.size / CHUNK);
           for (let i = 0; i < total; i++) {
-            const piece = file.slice(i * CHUNK, Math.min(file.size, (i + 1) * CHUNK));
-            setProg(i / total, `Mengunggah potongan ${i + 1} dari ${total} (${fmtSize(file.size)})`);
-            const r = await sendChunk(i, piece);
+            const start = i * CHUNK;
+            const piece = file.slice(start, Math.min(file.size, start + CHUNK));
+            const buf = await piece.arrayBuffer();
+            hash.update(new Uint8Array(buf));
+            const at = (frac) => ((start + frac * piece.size) / file.size) * 96;
+            ov.set(at(0), `Mengunggah ke server… bagian ${i + 1} dari ${total} (${fmtSize(file.size)})`);
+            const r = await sendChunk(i, buf, (loaded, tot) => ov.set(at(tot ? loaded / tot : 0)));
             parts.push({ url: r.url, size: r.size });
           }
-          setProg(1, 'Menyimpan rilis…');
+          sha = hash.hex();
         }
-        await post('/admin/releases', {
-          version, notes: el('#notes').value.trim(), force: el('#force').checked,
-          parts, sha256: sha, externalUrl: file ? null : ext,
-        });
+        ov.set(97, 'Menerbitkan ke semua pengguna…');
+        await post('/admin/releases', { version, notes, force, parts, sha256: sha, externalUrl: file ? null : ext });
+        ov.set(100, 'Selesai!');
         toast(`Versi ${version} terbit`, 'ok', 'Aplikasi akan menampilkan update saat dibuka');
-        el('#apk').value = ''; el('#prog').style.display = 'none';
+        ov.finish('ok', `Versi ${version} sudah terbit ke semua pengguna`,
+          'Pengguna melihat layar update saat membuka aplikasi (dicek otomatis tiap beberapa menit).',
+          [{ label: 'Selesai', cls: 'btn--blue', onClick: () => ov.close() }]);
+        el('#apk').value = '';
         loadHistory();
-      } catch (x) { toast(x.message, 'err'); setProg(0, 'Gagal. Coba lagi.'); }
-      finally { busy = false; btn.classList.remove('is-loading'); }
-    };
+      } catch (x) {
+        ferr(x.message);
+        ov.finish('err', x.message || 'Gagal menerbitkan.', 'Belum ada yang terbit. Perbaiki lalu coba lagi.', [
+          { label: 'Tutup', onClick: () => ov.close() },
+          { label: 'Coba lagi', cls: 'btn--blue', onClick: () => { ov.close(); publish(true); } },
+        ]);
+      } finally { busy = false; btn.classList.remove('is-loading'); }
+    }
+    el('#go').onclick = () => publish(false);
 
     async function loadHistory() {
       try {
