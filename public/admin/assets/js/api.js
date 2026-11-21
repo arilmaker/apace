@@ -70,3 +70,26 @@ export async function apiBytes(path, bytes) {
   if (!res.ok) throw new ApiError(readableError(data?.error ?? data?.message, `Terjadi kesalahan (${res.status})`), res.status, data);
   return data;
 }
+
+/** Seperti apiBytes, tapi melaporkan progres unggahan: onProgress(terkirim, total). Dipakai overlay 0–100% di Rilis. */
+export function apiBytesProgress(path, bytes, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API_BASE + path);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (getToken()) xhr.setRequestHeader('Authorization', `Bearer ${getToken()}`);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total); };
+    const netErr = () => reject(new ApiError('Tidak bisa terhubung ke server. Cek internet kamu.', 0));
+    xhr.onerror = netErr;
+    xhr.ontimeout = netErr;
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* bukan JSON */ }
+      if (xhr.status === 401) { clearToken(); location.replace('/admin/login.html'); }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new ApiError(readableError(data?.error ?? data?.message, `Terjadi kesalahan (${xhr.status})`), xhr.status, data));
+    };
+    xhr.send(bytes);
+  });
+}
