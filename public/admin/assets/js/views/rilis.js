@@ -3,7 +3,7 @@ import { get, post, patch, del, apiBytesProgress } from '../api.js';
 import { Sha256 } from '../sha256.js';
 import { $, html, raw, confirmBox, toast, timeAgo, fmtDateTime } from '../ui.js';
 
-const CHUNK = 4 * 1024 * 1024 - 1024; // sedikit di bawah 4 MB (batas body Vercel ~4,5 MB)
+const CHUNK = 1024 * 1024; // 1 MB per potongan: fungsi Vercel hanya hidup 15 dtk, jadi potongan 4 MB sering timeout di koneksi HP
 const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const hex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
 
@@ -100,7 +100,7 @@ export default {
       };
     }
 
-    async function sendChunk(idx, buf, onProgress, tries = 3) {
+    async function sendChunk(idx, buf, onProgress, tries = 4) {
       let last;
       for (let a = 1; a <= tries; a++) {
         try { return await apiBytesProgress(`/admin/releases/chunk?idx=${idx}`, buf, onProgress); }
