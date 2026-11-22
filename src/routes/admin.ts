@@ -437,7 +437,8 @@ export function registerAdmin(r: Router) {
       });
     } catch (e) {
       console.error('[R1ZCHATID] simpan potongan rilis gagal', e);
-      throw new HttpError(502, 'Gagal menyimpan ke Vercel Blob. Pastikan store Blob Public dan BLOB_READ_WRITE_TOKEN terpasang.');
+      const detail = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 160);
+      throw new HttpError(502, `Gagal menyimpan ke Vercel Blob (${detail}). Pastikan store Blob Public dan BLOB_READ_WRITE_TOKEN terpasang.`);
     }
     return { ok: true, url: blob.url, size: buf.length };
   });
@@ -451,7 +452,7 @@ export function registerAdmin(r: Router) {
     const externalUrl = v.optStr(b.externalUrl, 'Link unduhan', 500) ?? null;
     if (externalUrl && !/^https:\/\//.test(externalUrl)) throw badRequest('Link unduhan harus diawali https://');
     const partsIn = Array.isArray(b.parts) ? b.parts : [];
-    if (partsIn.length > 200) throw badRequest('Terlalu banyak potongan');
+    if (partsIn.length > 600) throw badRequest('Terlalu banyak potongan');
     const parts = partsIn.map((p: any) => {
       const url = String(p?.url ?? '');
       let host = '';
