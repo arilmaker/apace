@@ -83,12 +83,17 @@ export function apiBytesProgress(path, bytes, onProgress) {
     const netErr = () => reject(new ApiError('Tidak bisa terhubung ke server. Cek internet kamu.', 0));
     xhr.onerror = netErr;
     xhr.ontimeout = netErr;
+    const friendly = {
+      413: 'Potongan file terlalu besar untuk server (413).',
+      502: 'Server gagal menyimpan potongan ke penyimpanan (502).',
+      504: 'Server kehabisan waktu menerima potongan (504): koneksi upload terlalu lambat.',
+    };
     xhr.onload = () => {
       let data = {};
       try { data = JSON.parse(xhr.responseText); } catch { /* bukan JSON */ }
       if (xhr.status === 401) { clearToken(); location.replace('/admin/login.html'); }
       if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-      else reject(new ApiError(readableError(data?.error ?? data?.message, `Terjadi kesalahan (${xhr.status})`), xhr.status, data));
+      else reject(new ApiError(readableError(data?.error ?? data?.message, friendly[xhr.status] ?? `Terjadi kesalahan (${xhr.status})`), xhr.status, data));
     };
     xhr.send(bytes);
   });
